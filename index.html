@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Select Commitment</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            margin: 0;
+        }
+        h3 {
+            margin-top: 0;
+        }
+        select {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #0070d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #005bb5;
+        }
+        #status {
+            margin-top: 10px;
+            font-size: 13px;
+            color: green;
+        }
+        #error {
+            margin-top: 10px;
+            font-size: 13px;
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h3>Create Commitments</h3>
+    <p>Select an Investment to link to the selected Accounts:</p>
+    <select id="investmentDropdown">
+        <option value="">-- Loading Investments... --</option>
+    </select>
+    <button onclick="createCommitments()">Create Commitments</button>
+    <div id="status"></div>
+    <div id="error"></div>
+
+    <script src="https://live.zwidgets.com/js-sdk/1.0.5/ZohoEmbededAppSDK.min.js"></script>
+    <script>
+        var selectedAccountIds = [];
+        var ZOHO;
+
+        window.onload = function() {
+            ZOHO = window.ZOHO;
+            ZOHO.embeddedApp.on("PageLoad", function(data) {
+                selectedAccountIds = data.EntityId;
+                if (!Array.isArray(selectedAccountIds)) {
+                    selectedAccountIds = [selectedAccountIds];
+                }
+                loadInvestments();
+            });
+            ZOHO.embeddedApp.init();
+        };
+
+        function loadInvestments() {
+            ZOHO.CRM.API.getAllRecords({ Entity: "Investments", sort_order: "asc", per_page: 200 })
+                .then(function(data) {
+                    var dropdown = document.getElementById("investmentDropdown");
+                    dropdown.innerHTML = '<option value="">-- Select an Investment --</option>';
+                    if (data.data) {
+                        data.data.forEach(function(inv) {
+                            var option = document.createElement("option");
+                            option.value = inv.id;
+                            option.text = inv.Name;
+                            dropdown.appendChild(option);
+                        });
+                    } else {
+                        document.getElementById("error").innerText = "No Investments found.";
+                    }
+                });
+        }
+
+        function createCommitments() {
+            var dropdown = document.getElementById("investmentDropdown");
+            var investment_id = dropdown.value;
+            var investment_name = dropdown.options[dropdown.selectedIndex].text;
+
+            if (!investment_id) {
+                document.getElementById("error").innerText = "Please select an Investment.";
+                return;
+            }
+
+            document.getElementById("error").innerText = "";
+            document.getElementById("status").innerText = "Creating Commitments...";
+
+            var account_ids = selectedAccountIds.join(",");
+
+            ZOHO.CRM.FUNCTIONS.execute("createcommitmentsfromaccounts", {
+                arguments: JSON.stringify({
+                    investment_id: investment_id,
+                    investment_name: investment_name,
+                    account_ids: account_ids
+                })
+            }).then(function(response) {
+                document.getElementById("status").innerText = "Commitments created successfully!";
+            }).catch(function(err) {
+                document.getElementById("error").innerText = "Error: " + JSON.stringify(err);
+                document.getElementById("status").innerText = "";
+            });
+        }
+    </script>
+</body>
+</html>
